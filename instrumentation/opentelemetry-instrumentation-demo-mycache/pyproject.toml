@@ -1,0 +1,104 @@
+# =============================================================================
+# pyproject.toml - 插件配置文件（教学版）
+# =============================================================================
+# 
+# 【与 Java 对比】
+# +-----------------------+-----------------------------+----------------------------------+
+# | 功能                  | Java                        | Python                           |
+# +-----------------------+-----------------------------+----------------------------------+
+# | 依赖声明              | pom.xml / build.gradle      | pyproject.toml                   |
+# | 插件发现              | META-INF/services (SPI)     | entry-points (见下方配置)        |
+# | 版本约束              | <version>1.0</version>      | "mycache >= 1.0"                 |
+# +-----------------------+-----------------------------+----------------------------------+
+#
+# 【核心机制说明】
+# 1. [project.entry-points.opentelemetry_instrumentor] - 类似 Java SPI
+#    - Java: META-INF/services/io.opentelemetry.javaagent.extension.instrumentation.InstrumentationModule
+#    - Python: 通过 entry_points 注册，opentelemetry-instrument 命令会自动发现
+#
+# 2. [project.optional-dependencies].instruments - 声明目标库的版本要求
+#    - Java: 在 InstrumentationModule 中通过代码检测类是否存在
+#    - Python: 框架自动检测这些依赖是否满足
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "opentelemetry-instrumentation-demo-mycache"
+dynamic = ["version"]
+description = "OpenTelemetry Demo Instrumentation - 教学用例，展示如何编写一个完整的 Python Instrumentation"
+readme = "README.rst"
+license = "Apache-2.0"
+requires-python = ">=3.9"
+authors = [
+  { name = "OpenTelemetry Authors", email = "cncf-opentelemetry-contributors@lists.cncf.io" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+
+# =============================================================================
+# 核心依赖 - 运行时必须的依赖
+# =============================================================================
+dependencies = [
+  "opentelemetry-api ~= 1.12",                    # OT API，用于创建 Span
+  "opentelemetry-instrumentation == 0.61b0.dev",  # 基础框架，提供 BaseInstrumentor
+  "opentelemetry-semantic-conventions == 0.61b0.dev",  # 语义约定，标准属性名
+  "wrapt >= 1.12.1",                              # 用于猴子补丁（monkey patching）
+]
+
+# =============================================================================
+# 可选依赖 - 声明目标库的版本要求
+# =============================================================================
+# 【重要】这里声明的依赖会被 opentelemetry-instrument 命令用于判断是否需要生效此插件
+# 
+# 【与 Java 对比】
+# Java: InstrumentationModule.classLoaderOptimization() 或 TypeTransformer 中检测类是否存在
+# Python: 框架读取此配置，用 packaging 库检测版本是否匹配
+[project.optional-dependencies]
+instruments = [
+  "mycache >= 1.0",  # 声明支持 mycache 1.0 及以上版本
+]
+
+# =============================================================================
+# Entry Points - 插件发现机制（核心！）
+# =============================================================================
+# 【与 Java 对比】
+# Java SPI: META-INF/services/io.opentelemetry.javaagent.extension.instrumentation.InstrumentationModule
+#           文件内容: com.example.MyInstrumentationModule
+#
+# Python Entry Points: 配置在 pyproject.toml 中
+#           格式: <名称> = "<模块路径>:<类名>"
+#
+# 当运行 `opentelemetry-instrument python app.py` 时：
+# 1. 框架扫描所有已安装包的 opentelemetry_instrumentor entry point
+# 2. 检查 instruments 依赖是否满足
+# 3. 满足则调用 Instrumentor.instrument() 方法
+[project.entry-points.opentelemetry_instrumentor]
+demo_mycache = "opentelemetry.instrumentation.demo_mycache:MyCacheInstrumentor"
+
+[project.urls]
+Homepage = "https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation/opentelemetry-instrumentation-demo-mycache"
+Repository = "https://github.com/open-telemetry/opentelemetry-python-contrib"
+
+[tool.hatch.version]
+path = "src/opentelemetry/instrumentation/demo_mycache/version.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/tests",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/opentelemetry"]
